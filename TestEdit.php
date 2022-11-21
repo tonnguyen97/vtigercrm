@@ -23,15 +23,13 @@ ini_set('post_max_size', '1000M');
 ini_set('upload_max_filesize', '1000M');
 
 
-$adb = PearDatabase::getInstance();   
+$adb = PearDatabase::getInstance();
 $user = Users::getActiveAdminUser();
-//global $current_user;
 $current_user = Users_Record_Model::getCurrentUserModel();
 if ((int) $current_user->id == 0) {
     $current_user = $user;
 }
-// AND vtiger_inventoryproductrel.tax1=8.0
-/*get account records have cf_nrl_vteemployee881_id is not null && cf_nrl_vteemployee881_id!=0*/
+
 $querySelect = "SELECT DISTINCT salesorderid, subject, adjustment, subtotal, vtiger_salesorder.discount_amount, s_h_amount, pre_tax_total, tax1, tax2, tax3, charges FROM vtiger_salesorder
 LEFT JOIN vtiger_inventoryproductrel ON vtiger_salesorder.salesorderid = vtiger_inventoryproductrel.id
 LEFT JOIN vtiger_crmentity ON vtiger_salesorder.salesorderid = vtiger_crmentity.crmid
@@ -45,8 +43,7 @@ LEFT JOIN vtiger_crmentity ON vtiger_salesorder.salesorderid = vtiger_crmentity.
 SET     vtiger_inventoryproductrel.tax1 = ?, vtiger_salesorder.total = ?
 WHERE   vtiger_crmentity.deleted=0  AND vtiger_salesorder.salesorderid = ?";
 
-
-$tax1 = 7.7;
+$tax1 = 8.0;
 
 $results = $adb->pquery($querySelect, array($tax1));
 if ($adb->num_rows($results) > 0) {
@@ -74,22 +71,14 @@ if ($adb->num_rows($results) > 0) {
         $taxVAT = $newSaleOrderTax;
         $taxSale = $row['tax2'];
         $taxService = $row['tax3'];
-        $amount = (float)$netTotal - (float)$discountTotal;
+        $amount = (float) $netTotal - (float) $discountTotal;
 
-        $taxValue = ((float)$taxVAT  / 100  + (float)$taxSale  / 100  + (float)$taxService / 100) * (float)$amount;
-        print($calculatedOn . ": " . $shippingHandlingTax . " ----------------------- ");
+        $taxValue = ((float) $taxVAT / 100 + (float) $taxSale / 100 + (float) $taxService / 100) * (float) $amount;
         $deductedTaxesAmount = 0.0;
 
-        $grandTotal = (float)$netTotal - (float)$discountTotal + (float)$shippingHandlingCharge + (float)$shippingHandlingTax - (float)$deductedTaxesAmount + (float)$taxValue;
+        $grandTotal = (float) $netTotal - (float) $discountTotal + (float) $shippingHandlingCharge + (float) $shippingHandlingTax - (float) $deductedTaxesAmount + (float) $taxValue;
 
         $adb->pquery($queryUpdate, array($newSaleOrderTax, $grandTotal, $saleOrderID));
-
-        $saleOrderFocus = CRMEntity::getInstance('SalesOrder');
-        $saleOrderFocus->id = $saleOrderID;
-        $saleOrderFocus->mode = 'edit';
-        $saleOrderFocus->retrieve_entity_info($saleOrderID, 'SalesOrder');
-        $saleOrderFocus->column_fields['subject'] = $saleOrderSubject;
-        $saleOrderFocus->saveentity("SalesOrder");
 
     }
 };
