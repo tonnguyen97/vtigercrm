@@ -23,7 +23,7 @@ ini_set('post_max_size', '1000M');
 ini_set('upload_max_filesize', '1000M');
 
 
-$adb = PearDatabase::getInstance();
+$adb = PearDatabase::getInstance();   
 $user = Users::getActiveAdminUser();
 //global $current_user;
 $current_user = Users_Record_Model::getCurrentUserModel();
