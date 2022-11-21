@@ -1,5 +1,5 @@
 <?php
-// chdir('..');
+chdir('..');
 require_once('include/utils/utils.php');
 require_once("vtlib/Vtiger/Module.php");
 require_once("vtlib/Vtiger/Block.php");
@@ -25,62 +25,42 @@ ini_set('upload_max_filesize', '1000M');
 
 $adb = PearDatabase::getInstance();
 $user = Users::getActiveAdminUser();
-//global $current_user;
 $current_user = Users_Record_Model::getCurrentUserModel();
 if ((int) $current_user->id == 0) {
     $current_user = $user;
 }
-// AND vtiger_inventoryproductrel.tax1=8.0
-/*get account records have cf_nrl_vteemployee881_id is not null && cf_nrl_vteemployee881_id!=0*/
+
 $querySelect = "SELECT DISTINCT salesorderid, subject, adjustment, subtotal, vtiger_salesorder.discount_amount, s_h_amount, pre_tax_total, tax1, tax2, tax3, charges FROM vtiger_salesorder
 LEFT JOIN vtiger_inventoryproductrel ON vtiger_salesorder.salesorderid = vtiger_inventoryproductrel.id
 LEFT JOIN vtiger_crmentity ON vtiger_salesorder.salesorderid = vtiger_crmentity.crmid
 LEFT JOIN vtiger_inventorychargesrel ON vtiger_salesorder.salesorderid = vtiger_inventorychargesrel.recordid
-WHERE vtiger_crmentity.deleted=0 AND vtiger_salesorder.salesorderid = 242
+WHERE vtiger_crmentity.deleted=0 AND vtiger_inventoryproductrel.tax1 = ?
 GROUP BY vtiger_salesorder.salesorderid";
 
 $queryUpdate = "UPDATE  vtiger_salesorder
 LEFT JOIN vtiger_inventoryproductrel ON vtiger_salesorder.salesorderid = vtiger_inventoryproductrel.id
 LEFT JOIN vtiger_crmentity ON vtiger_salesorder.salesorderid = vtiger_crmentity.crmid
 SET     vtiger_inventoryproductrel.tax1 = ?, vtiger_salesorder.total = ?
-WHERE   vtiger_crmentity.deleted=0  AND vtiger_salesorder.salesorderid = 242";
+WHERE   vtiger_crmentity.deleted=0  AND vtiger_salesorder.salesorderid = ?";
 
-// $queryCharge = "SELECT DISTINCT charges FROM vtiger_inventorychargesrel
-// LEFT JOIN vtiger_salesorder ON salesorderid=recordid
-// LEFT JOIN vtiger_crmentity ON crmid=recordid
-// WHERE vtiger_crmentity.deleted=0
-// GROUP BY recordid";
+$tax1 = 8.0;
 
-// $results = $adb->pquery($queryCharge, array());
-// if ($adb->num_rows($results) > 0) {
-//     while ($row = $adb->fetchByAssoc($results)) {
-//         var_dump($row['charges']);
-//         // var_dump(json_decode($row['charges']), true);
-//     }
-// };
-
-
-$totalAmount = 0.00;
-
-
-
-$results = $adb->pquery($querySelect, array());
+$results = $adb->pquery($querySelect, array($tax1));
 if ($adb->num_rows($results) > 0) {
     $_REQUEST['ajxaction'] = 'DETAILVIEW';
     while ($row = $adb->fetchByAssoc($results)) {
         $saleOrderID = $row['salesorderid'];
         $saleOrderTax = $row['tax1'];
         $saleOrderSubject = $row['subject'];
-        $newSaleOrderTax = 7.7;
-
-        // var_dump($row['charges']);
         $chargesList = Zend_Json::decode(html_entity_decode($row['charges']));
-        // var_dump($adb->fetch_array($row['charges']));
+        $newSaleOrderTax = 7.7;
+        $totalAmount = 0.00;
 
         foreach ($chargesList as $chargeId => $chargeInfo) {
             foreach ($chargeInfo['taxes'] as $taxId => $taxPercent) {
-                $amount = $calculatedOn = $chargeInfo['value'];
+                $calculatedOn = $chargeInfo['value'];
                 $totalAmount += ((float) $calculatedOn * (float) $taxPercent) / 100;
+                $shippingHandlingTax = $totalAmount;
             }
         }
 
@@ -88,29 +68,17 @@ if ($adb->num_rows($results) > 0) {
         $discountTotal = $row['discount_amount'];
         $shippingHandlingCharge = $row['s_h_amount'];
         $preTaxTotal = $row['pre_tax_total'];
-        $taxVAT = $row['tax1'];
+        $taxVAT = $newSaleOrderTax;
         $taxSale = $row['tax2'];
         $taxService = $row['tax3'];
-        $amount = (float)$netTotal - (float)$discountTotal;
+        $amount = (float) $netTotal - (float) $discountTotal;
 
-        $taxValue = ((float)$taxVAT  / 100  + (float)$taxSale  / 100  + (float)$taxService / 100) * (float)$amount;
-        print($taxTotal);
-        $shippingHandlingTax = $totalAmount;
+        $taxValue = ((float) $taxVAT / 100 + (float) $taxSale / 100 + (float) $taxService / 100) * (float) $amount;
         $deductedTaxesAmount = 0.0;
 
-        $grandTotal = (float)$netTotal - (float)$discountTotal + (float)$shippingHandlingCharge + (float)$shippingHandlingTax - (float)$deductedTaxesAmount + (float)$taxValue;
+        $grandTotal = (float) $netTotal - (float) $discountTotal + (float) $shippingHandlingCharge + (float) $shippingHandlingTax - (float) $deductedTaxesAmount + (float) $taxValue;
 
-        print($grandTotal);
-
-        $adb->pquery($queryUpdate, array($newSaleOrderTax, $grandTotal));
-
-        // print($saleOrderID . ":\t" . $saleOrderSubject . " - " . $saleOrderTax . "% -------------------------------- ");
-        $saleOrderFocus = CRMEntity::getInstance('SalesOrder');
-        $saleOrderFocus->id = $saleOrderID;
-        $saleOrderFocus->mode = 'edit';
-        $saleOrderFocus->retrieve_entity_info($saleOrderID, 'SalesOrder');
-        $saleOrderFocus->column_fields['subject'] = $saleOrderSubject;
-        $saleOrderFocus->saveentity("SalesOrder");
+        $adb->pquery($queryUpdate, array($newSaleOrderTax, $grandTotal, $saleOrderID));
 
     }
 };
