@@ -1,5 +1,5 @@
 <?php
-// chdir('..');
+chdir('..');
 require_once('include/utils/utils.php');
 require_once("vtlib/Vtiger/Module.php");
 require_once("vtlib/Vtiger/Block.php");
